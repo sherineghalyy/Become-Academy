@@ -17,7 +17,7 @@ const opts = {
   jsx: 'automatic',
   loader: { '.jpg': SINGLE ? 'dataurl' : 'file', '.png': SINGLE ? 'dataurl' : 'file' },
   assetNames: 'assets/[name]-[hash]',
-  define: { 'process.env.NODE_ENV': SERVE ? '"development"' : '"production"' },
+  define: { 'process.env.NODE_ENV': SERVE ? '"development"' : '"production"', __PREVIEW__: SINGLE ? 'true' : 'false' },
   legalComments: 'none',
   outdir: 'dist',
   logLevel: 'info',

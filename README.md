@@ -46,3 +46,7 @@ host, add the same headers in its settings.
 - Do not publish the Google Drive link for Recorded sessions in the code. Send it by email or
   WhatsApp after checking the payment screenshots.
 - Forms have a hidden honeypot field, input length limits and a 20 second cooldown per browser.
+
+
+## Recorded courses
+Instapay and Drive links live in `src/config.js`. The Drive link is shown on the success screen, so anyone reading the site code can find it; share the folder as Viewer. The preview build simulates sending (no email); the real build emails via FormSubmit.

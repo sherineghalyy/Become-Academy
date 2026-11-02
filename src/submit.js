@@ -12,6 +12,9 @@ export function cooldownLeft() {
   }
 }
 
+/* eslint-disable no-undef */
+const PREVIEW = typeof __PREVIEW__ !== 'undefined' && __PREVIEW__
+
 const clean = (v) => String(v ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').slice(0, 2000)
 
 /**
@@ -24,6 +27,12 @@ export async function submit(kind, rows, files = {}) {
   const text = kind + '\n' + rows.map(([k, v]) => `${k}: ${clean(v)}`).join('\n')
   const left = cooldownLeft()
   if (left > 0) return { status: 'wait', seconds: Math.ceil(left / 1000), text }
+
+  // Preview build (shown inside Claude): nothing leaves the page, so the flow can be tried end to end.
+  if (PREVIEW) {
+    await new Promise((r) => setTimeout(r, 700))
+    return { status: 'sent', text, preview: true }
+  }
 
   const fd = new FormData()
   fd.append('_subject', 'BECOME: ' + clean(kind))

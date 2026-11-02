@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { DEPT, FACULTIES, courseFields } from './data'
-import { COURSE_DATE, COURSE_TIME, INSTAPAY_URL, PHONE, RECORDED_FEE } from './config'
+import { COURSE_DATE, COURSE_TIME, DRIVE_URL, INSTAPAY_URL, PHONE, RECORDED_FEE } from './config'
 import { cooldownLeft, copyText, submit } from './submit'
+import { rules, validateField, validateImage } from './validate'
 
 /* ---------- context: any button can open a form ---------- */
 const ModalCtx = createContext(null)
@@ -84,7 +85,7 @@ function Head({ title, labels, step, onClose }) {
 }
 
 /* last screen of every form */
-function Result({ heading, lead, rows, res, onRetry, onClose }) {
+function Result({ heading, lead, rows, res, onRetry, onClose, action }) {
   const [copied, setCopied] = useState(false)
   if (res.status !== 'sent') {
     return (
@@ -113,7 +114,11 @@ function Result({ heading, lead, rows, res, onRetry, onClose }) {
           {rows.map(([k, v]) => (<div key={k}><dt>{k}</dt><dd>{v}</dd></div>))}
         </dl>
       )}
-      <div className="nav-row"><span /><button className="btn primary sm" type="button" onClick={onClose}>Done</button></div>
+      {res.preview && <p className="hint" style={{ marginTop: 16 }}>Preview only: nothing was emailed. On the live site this is sent to your inbox.</p>}
+      <div className="nav-row">
+        {action ? <a className="btn primary" href={action.href} target="_blank" rel="noopener noreferrer">{action.label}</a> : <span />}
+        <button className={'btn sm ' + (action ? 'line' : 'primary')} type="button" onClick={onClose}>Done</button>
+      </div>
     </>
   )
 }
@@ -142,6 +147,16 @@ const Honeypot = ({ value, onChange }) => (
   <input className="hp" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" value={value} onChange={(e) => onChange(e.target.value)} />
 )
 
+function TextField({ id, label, type = 'text', value, onChange, error, max = 100, ...rest }) {
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <input id={id} type={type} maxLength={max} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={!!error} aria-describedby={error ? id + '-e' : undefined} {...rest} />
+      {error && <span className="ferr" id={id + '-e'} role="alert">{error}</span>}
+    </div>
+  )
+}
+
 const waitMsg = (res) => `Please wait ${res.seconds} seconds before sending another request.`
 
 /* ---------- booking: 3 screens ---------- */
@@ -161,16 +176,18 @@ function BookingFlow({ kind, onClose }) {
   const [days, setDays] = useState('')
   const [time, setTime] = useState('')
   const [f, setF] = useState({ name: '', phone: '', email: '', note: '' })
+  const [errs, setErrs] = useState({})
   const [hp, setHp] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [res, setRes] = useState(null)
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+  const set = (k) => (v) => { setF({ ...f, [k]: v }); setErrs({ ...errs, [k]: '' }) }
   const rows = () => [['Booking', name], ['Available days', days], ['Available time', time], ['Name', f.name.trim()], ['WhatsApp', f.phone.trim()], ['Email', f.email.trim()], ...(f.note.trim() ? [['Note', f.note.trim()]] : [])]
 
   async function onSubmit(e) {
     e.preventDefault()
-    if (!f.name.trim() || !f.phone.trim() || !emailOk(f.email.trim())) return setErr('Add your name, a WhatsApp number and a valid email to continue.')
+    const e2 = { name: rules.name(f.name), phone: rules.phone(f.phone), email: rules.email(f.email) }
+    if (Object.values(e2).some(Boolean)) { setErrs(e2); return setErr('Please correct the highlighted fields.') }
     if (hp) { setRes({ status: 'sent', text: '' }); return setStep(3) }
     const left = cooldownLeft()
     if (left > 0) return setErr(waitMsg({ seconds: Math.ceil(left / 1000) }))
@@ -197,11 +214,11 @@ function BookingFlow({ kind, onClose }) {
       {step === 2 && (
         <form onSubmit={onSubmit} noValidate>
           <div className="row2">
-            <div className="field"><label htmlFor="fName">Full name</label><input id="fName" autoComplete="name" maxLength={80} value={f.name} onChange={set('name')} autoFocus /></div>
-            <div className="field"><label htmlFor="fPhone">WhatsApp number</label><input id="fPhone" type="tel" autoComplete="tel" maxLength={25} value={f.phone} onChange={set('phone')} /></div>
+            <TextField id="fName" label="Full name" autoComplete="name" max={80} value={f.name} onChange={set('name')} error={errs.name} autoFocus />
+            <TextField id="fPhone" label="WhatsApp number" type="tel" autoComplete="tel" max={25} value={f.phone} onChange={set('phone')} error={errs.phone} />
           </div>
-          <div className="field"><label htmlFor="fMail">Email</label><input id="fMail" type="email" autoComplete="email" maxLength={120} value={f.email} onChange={set('email')} /></div>
-          <div className="field"><label htmlFor="fNote">Anything we should know? (optional)</label><textarea id="fNote" maxLength={600} value={f.note} onChange={set('note')} /></div>
+          <TextField id="fMail" label="Email" type="email" autoComplete="email" max={120} value={f.email} onChange={set('email')} error={errs.email} />
+          <div className="field"><label htmlFor="fNote">Anything we should know? (optional)</label><textarea id="fNote" maxLength={600} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></div>
           <Honeypot value={hp} onChange={setHp} />
           <p className="hint" style={{ color: 'var(--red)' }} role="alert">{err}</p>
           <div className="nav-row" style={{ marginTop: 14 }}>
@@ -275,23 +292,25 @@ const FLOWS = {
 const flat = (fields) => fields.flatMap((f) => (Array.isArray(f) ? f : [f]))
 const LIMITS = { text: 100, tel: 25, email: 120, number: 6, textarea: 600 }
 
-function Control({ f, v, set }) {
+function Control({ f, v, set, error }) {
   const id = 'ff_' + f.id
   const label = f.label + (f.opt ? ' (optional)' : '')
   const on = (e) => set(f.id, e.target.value)
+  const a11y = { 'aria-invalid': !!error, 'aria-describedby': error ? id + '-e' : undefined }
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
       {f.type === 'textarea' && <textarea id={id} maxLength={LIMITS.textarea} value={v[f.id] || ''} onChange={on} />}
       {f.type === 'select' && (
-        <select id={id} value={v[f.id] || ''} onChange={on}>
+        <select id={id} value={v[f.id] || ''} onChange={on} {...a11y}>
           <option value="">Choose</option>
           {f.options.map(([val, l]) => (<option key={val} value={val}>{l}</option>))}
         </select>
       )}
       {f.type !== 'textarea' && f.type !== 'select' && (
-        <input id={id} type={f.type} maxLength={LIMITS[f.type] || 100} {...(f.type === 'number' ? { min: 0, inputMode: 'numeric' } : {})} value={v[f.id] || ''} onChange={on} />
+        <input id={id} type={f.type} maxLength={LIMITS[f.type] || 100} {...(f.type === 'number' ? { min: 0, inputMode: 'numeric' } : {})} value={v[f.id] || ''} onChange={on} {...a11y} />
       )}
+      {error && <span className="ferr" id={id + '-e'} role="alert">{error}</span>}
     </div>
   )
 }
@@ -301,22 +320,22 @@ function FormFlow({ def, course, onClose }) {
   const [v, setV] = useState({ courses: [] })
   const [hp, setHp] = useState('')
   const [err, setErr] = useState('')
+  const [errs, setErrs] = useState({})
   const [busy, setBusy] = useState(false)
   const [out, setOut] = useState(null)
-  const set = (id, val) => setV((p) => ({ ...p, [id]: val, ...(id === 'dept' ? { courses: [] } : {}) }))
+  const set = (id, val) => { setV((p) => ({ ...p, [id]: val, ...(id === 'dept' ? { courses: [] } : {}) })); setErrs((p) => ({ ...p, [id]: '' })) }
   const title = def.title(course)
 
   async function onSubmit(e) {
     e.preventDefault()
-    let msg = ''
+    const e2 = {}
     flat(def.fields).forEach((f) => {
-      if (msg || f.opt) return
-      if (f.type === 'courses') { if (!v.courses.length) msg = 'Choose at least one course you can train.'; return }
-      const val = String(v[f.id] || '').trim()
-      if (!val) msg = 'Please complete every field.'
-      else if (f.type === 'email' && !emailOk(val)) msg = 'Enter a valid email address.'
+      if (f.opt) return
+      if (f.type === 'courses') { if (!v.courses.length) e2.courses = 'Choose at least one course you can train.'; return }
+      const m = validateField(f, v[f.id] || '')
+      if (m) e2[f.id] = m
     })
-    if (msg) return setErr(msg)
+    if (Object.keys(e2).length) { setErrs(e2); return setErr('Please correct the highlighted fields.') }
     const clean = Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'string' ? x.trim() : x]))
     const built = def.build(clean, course)
     if (hp) { setOut({ built, res: { status: 'sent', text: '' } }); return setStep(2) }
@@ -334,7 +353,7 @@ function FormFlow({ def, course, onClose }) {
         <form onSubmit={onSubmit} noValidate>
           {def.fields.map((f, i) =>
             Array.isArray(f) ? (
-              <div className="row2" key={i}>{f.map((g) => <Control key={g.id} f={g} v={v} set={set} />)}</div>
+              <div className="row2" key={i}>{f.map((g) => <Control key={g.id} f={g} v={v} set={set} error={errs[g.id]} />)}</div>
             ) : f.type === 'courses' ? (
               <div className="field" key={f.id}>
                 <span className="lab" style={{ margin: 0 }}>{f.label}</span>
@@ -343,9 +362,10 @@ function FormFlow({ def, course, onClose }) {
                 ) : (
                   <span className="hint">Choose a field to see its courses.</span>
                 )}
+                {errs.courses && <span className="ferr" role="alert">{errs.courses}</span>}
               </div>
             ) : (
-              <Control key={f.id} f={f} v={v} set={set} />
+              <Control key={f.id} f={f} v={v} set={set} error={errs[f.id]} />
             ),
           )}
           <Honeypot value={hp} onChange={setHp} />
@@ -363,27 +383,32 @@ function FormFlow({ def, course, onClose }) {
   )
 }
 
-/* ---------- recorded course: pay, upload two screenshots, confirm ---------- */
+/* ---------- recorded course: details + pay, upload two screenshots, confirm ---------- */
 const RL = ['Payment', 'Screenshots', 'Confirmation']
 const price = RECORDED_FEE.toLocaleString('en-US') + ' EGP'
-const MAX = 8 * 1024 * 1024
 
 function RecordedFlow({ course, onClose }) {
   const title = 'Recorded: ' + course
   const [step, setStep] = useState(1)
-  const [f, setF] = useState({ name: '', phone: '' })
+  const [f, setF] = useState({ name: '', email: '', phone: '' })
   const [s1, setS1] = useState(null)
   const [s2, setS2] = useState(null)
+  const [errs, setErrs] = useState({})
   const [hp, setHp] = useState('')
   const [err, setErr] = useState('')
   const [phase, setPhase] = useState('loading')
   const [res, setRes] = useState(null)
+  const set = (k) => (v) => { setF({ ...f, [k]: v }); setErrs({ ...errs, [k]: '' }) }
+
+  function toScreenshots() {
+    const e2 = { name: rules.name(f.name), email: rules.email(f.email), phone: rules.phone(f.phone) }
+    if (Object.values(e2).some(Boolean)) { setErrs(e2); return setErr('Please correct the highlighted fields.') }
+    setErr(''); setStep(2)
+  }
 
   function confirm() {
-    if (!f.name.trim() || !f.phone.trim()) return setErr('Add your name and WhatsApp number.')
-    if (!s1 || !s2) return setErr('Upload both screenshots to continue.')
-    if (![s1, s2].every((x) => x.type.startsWith('image/'))) return setErr('Screenshots must be images.')
-    if ([s1, s2].some((x) => x.size > MAX)) return setErr('Each screenshot must be under 8 MB.')
+    const e2 = { s1: validateImage(s1), s2: validateImage(s2) }
+    if (e2.s1 || e2.s2) { setErrs(e2); return setErr('Please upload both screenshots.') }
     const left = cooldownLeft()
     if (left > 0) return setErr(waitMsg({ seconds: Math.ceil(left / 1000) }))
     setErr(''); setPhase('loading'); setStep(3)
@@ -392,7 +417,7 @@ function RecordedFlow({ course, onClose }) {
   useEffect(() => {
     if (step !== 3) return
     let alive = true
-    const rows = [['Course', course], ['Format', 'Recorded'], ['Amount', price], ['Name', f.name.trim()], ['WhatsApp', f.phone.trim()]]
+    const rows = [['Course', course], ['Format', 'Recorded'], ['Amount', price], ['Name', f.name.trim()], ['Email', f.email.trim()], ['Number', f.phone.trim()]]
     const send = hp ? Promise.resolve({ status: 'sent', text: '' }) : submit('Recorded course payment', rows, { payment_screenshot: s1, details_screenshot: s2 })
     Promise.all([send, new Promise((r) => setTimeout(r, 2800))]).then(([r]) => {
       if (!alive) return
@@ -406,27 +431,31 @@ function RecordedFlow({ course, onClose }) {
       <Head title={title} labels={RL} step={step} onClose={onClose} />
       {step === 1 && (
         <>
-          <p className="done-lead" style={{ margin: '0 0 16px' }}>Pay <b style={{ color: 'var(--fg)' }}>{price}</b> through this Instapay link:</p>
-          {INSTAPAY_URL ? (
-            <a className="btn line" href={INSTAPAY_URL} target="_blank" rel="noopener noreferrer">Open Instapay link</a>
-          ) : (
-            <div className="callout">The Instapay link will appear here.</div>
-          )}
+          <TextField id="rName" label="Name" autoComplete="name" max={80} value={f.name} onChange={set('name')} error={errs.name} autoFocus />
+          <TextField id="rMail" label="Email" type="email" autoComplete="email" max={120} value={f.email} onChange={set('email')} error={errs.email} />
+          <TextField id="rPhone" label="Number" type="tel" autoComplete="tel" max={25} value={f.phone} onChange={set('phone')} error={errs.phone} />
+          <p className="done-lead" style={{ margin: '8px 0 14px' }}>Pay <b style={{ color: 'var(--fg)' }}>{price}</b> through this Instapay link:</p>
+          <a className="btn line" href={INSTAPAY_URL} target="_blank" rel="noopener noreferrer">Open Instapay link</a>
           <p className="hint" style={{ marginTop: 16 }}>When the payment is complete, press Done and upload two screenshots.</p>
-          <div className="nav-row">
+          <p className="hint" style={{ color: 'var(--red)' }} role="alert">{err}</p>
+          <div className="nav-row" style={{ marginTop: 10 }}>
             <button className="btn line" type="button" onClick={onClose}>Cancel</button>
-            <button className="btn primary" type="button" onClick={() => setStep(2)}>Done</button>
+            <button className="btn primary" type="button" onClick={toScreenshots}>Done</button>
           </div>
         </>
       )}
       {step === 2 && (
         <>
-          <div className="row2">
-            <div className="field"><label htmlFor="rName">Full name</label><input id="rName" autoComplete="name" maxLength={80} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
-            <div className="field"><label htmlFor="rPhone">WhatsApp number</label><input id="rPhone" type="tel" autoComplete="tel" maxLength={25} value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></div>
+          <div className="field">
+            <label htmlFor="shot1">Screenshot 1: the payment</label>
+            <input className="filein" id="shot1" type="file" accept="image/*" aria-invalid={!!errs.s1} onChange={(e) => { setS1(e.target.files[0] || null); setErrs({ ...errs, s1: '' }) }} />
+            {errs.s1 && <span className="ferr" role="alert">{errs.s1}</span>}
           </div>
-          <div className="field"><label htmlFor="shot1">Screenshot 1: the payment</label><input className="filein" id="shot1" type="file" accept="image/*" onChange={(e) => setS1(e.target.files[0] || null)} /></div>
-          <div className="field"><label htmlFor="shot2">Screenshot 2: the payment details</label><input className="filein" id="shot2" type="file" accept="image/*" onChange={(e) => setS2(e.target.files[0] || null)} /></div>
+          <div className="field">
+            <label htmlFor="shot2">Screenshot 2: the payment details</label>
+            <input className="filein" id="shot2" type="file" accept="image/*" aria-invalid={!!errs.s2} onChange={(e) => { setS2(e.target.files[0] || null); setErrs({ ...errs, s2: '' }) }} />
+            {errs.s2 && <span className="ferr" role="alert">{errs.s2}</span>}
+          </div>
           <Honeypot value={hp} onChange={setHp} />
           <p className="hint" style={{ color: 'var(--red)' }} role="alert">{err}</p>
           <div className="nav-row" style={{ marginTop: 14 }}>
@@ -446,9 +475,10 @@ function RecordedFlow({ course, onClose }) {
       {step === 3 && phase !== 'loading' && res && (
         <Result
           heading="Your payment has been successfully done"
-          lead="We will send your recorded sessions link to you shortly."
+          lead="Your recorded sessions are ready to watch."
           rows={[['Course', course], ['Format', 'Recorded'], ['Amount', price]]}
           res={res}
+          action={{ href: DRIVE_URL, label: 'Watch recorded sessions' }}
           onRetry={() => setStep(2)}
           onClose={onClose}
         />

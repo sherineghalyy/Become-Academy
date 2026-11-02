@@ -6,8 +6,12 @@
 export const BOOKING_TO = 'sherineghalyy@gmail.com'
 export const FORM_ENDPOINT = 'https://formsubmit.co/ajax/' + BOOKING_TO
 
-// Instapay payment link for Recorded courses. Leave empty until you have it.
-export const INSTAPAY_URL = ''
+// Instapay payment link for Recorded courses.
+export const INSTAPAY_URL = 'https://ipn.eg/S/sherineghalyy/instapay/7hAu8G'
+
+// Drive folder with the recorded sessions, shown on the Recorded success screen after payment.
+// Note: this link is inside the website code, so anyone who reads the code can find it. Share the folder as "Viewer".
+export const DRIVE_URL = 'https://drive.google.com/drive/folders/12q6Vc5SY6lYFYY8-eeVQ3k2XJEeQMNjf?usp=sharing'
 
 export const PHONE = '+20 1205870386'
 export const WHATSAPP_URL = 'https://wa.me/201205870386'

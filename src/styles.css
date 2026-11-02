@@ -259,3 +259,5 @@ footer a:hover{color:var(--fg)}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
 
 .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none}
+.ferr{color:var(--red);font-size:12.5px;line-height:1.4}
+[aria-invalid="true"]{border-color:var(--red)!important}
