@@ -18,6 +18,7 @@ import osman from './assets/inst-osman.jpg'
 import latif from './assets/inst-latif.jpg'
 import nada from './assets/inst-nada.jpg'
 import tasneem from './assets/inst-tasneem.jpg'
+import osama from './assets/inst-osama.jpg'
 
 import s1 from './assets/session-1.jpg'
 import s2 from './assets/session-2.jpg'
@@ -92,6 +93,7 @@ export const INSTRUCTORS = [
   { name: 'Eng. Abd Ellatif', img: latif, facts: ['30+ Years of Experience', 'Mechanical & Die Design Engineer'] },
   { name: 'Eng. Nada Youssef', img: nada, facts: ['3+ Years of Experience', 'Senior Graphic Designer'] },
   { name: 'Eng. Tasneem Sherif', img: tasneem, facts: ['4+ Years of Experience', 'DevOps Engineer - AWS Certified'] },
+  { name: 'Eng. Mohamed Osama', img: osama, facts: ['5+ Years of Experience', 'Flutter Developer'] },
 ]
 
 export const FACULTIES = ['Engineering', 'Computer Science & Information Technology', 'Business / Commerce', 'Fine Arts / Applied Arts', 'Science', 'Other']

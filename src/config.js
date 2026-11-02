@@ -20,6 +20,7 @@ export const PERSONAL_EMAIL = 'sherineghalyy@gmail.com'
 
 export const COURSE_DATE = '1/12/2026'
 export const COURSE_TIME = '8:00 PM'
+export const COURSE_DAYS = 'Saturdays and Tuesdays'
 export const DEFAULT_FEE = 4000
 export const DEFAULT_SEATS = 20
 export const RECORDED_FEE = 2000

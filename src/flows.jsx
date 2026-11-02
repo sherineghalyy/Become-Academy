@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { DEPT, FACULTIES, courseFields } from './data'
-import { COURSE_DATE, COURSE_TIME, DRIVE_URL, INSTAPAY_URL, PHONE, RECORDED_FEE } from './config'
+import { COURSE_DAYS, COURSE_DATE, COURSE_TIME, DRIVE_URL, INSTAPAY_URL, PHONE, RECORDED_FEE } from './config'
 import { cooldownLeft, copyText, submit } from './submit'
 import { rules, validateField, validateImage } from './validate'
 
@@ -244,7 +244,7 @@ const FLOWS = {
     fields: [[{ id: 'name', label: 'Name', type: 'text' }, { id: 'phone', label: 'Number', type: 'tel' }], { id: 'email', label: 'Email', type: 'email' }, { id: 'note', label: 'Any comments', type: 'textarea', opt: 1 }],
     build: (v, c) => ({
       rows: [['Course', c], ['Format', 'Live'], ['Name', v.name], ['Email', v.email], ['Number', v.phone], ['Comments', v.note || '-']],
-      done: { heading: `You have enrolled successfully in ${c} course`, rows: [['Course', c], ['Format', 'Live'], ['Date', COURSE_DATE], ['Time', COURSE_TIME]] },
+      done: { heading: `You have enrolled successfully in ${c} course`, rows: [['Course', c], ['Format', 'Live'], ['Date', COURSE_DATE], ['Days', COURSE_DAYS], ['Time', COURSE_TIME]] },
     }),
   },
   instructor: {
